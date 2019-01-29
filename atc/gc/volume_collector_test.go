@@ -87,7 +87,7 @@ var _ = Describe("VolumeCollector", func() {
 
 		Context("when there are failed volumes", func() {
 			JustBeforeEach(func() {
-				creatingVolume1, err := volumeRepository.CreateContainerVolume(team.ID(), worker.Name(), creatingContainer1, "some-path-1")
+				creatingVolume1, err := volumeRepository.CreateContainerVolume(team.ID(), worker.Name(), "some-path-1")
 				Expect(err).NotTo(HaveOccurred())
 
 				_, err = creatingVolume1.Failed()
@@ -110,6 +110,7 @@ var _ = Describe("VolumeCollector", func() {
 
 		Context("when there are orphaned volumes", func() {
 			var expectedOrphanedVolumeHandles []string
+			var createdVolume2 db.CreatedVolume
 
 			JustBeforeEach(func() {
 				creatingContainer2, err = worker.CreateContainer(db.NewBuildStepContainerOwner(build.ID(), "some-plan", team.ID()), db.ContainerMetadata{
@@ -118,18 +119,19 @@ var _ = Describe("VolumeCollector", func() {
 				})
 				Expect(err).ToNot(HaveOccurred())
 
-				creatingVolume1, err := volumeRepository.CreateContainerVolume(team.ID(), worker.Name(), creatingContainer1, "some-path-1")
+				creatingVolume1, err := volumeRepository.CreateContainerVolume(team.ID(), worker.Name(), "some-path-1")
 				Expect(err).NotTo(HaveOccurred())
 				expectedOrphanedVolumeHandles = append(expectedOrphanedVolumeHandles, creatingVolume1.Handle())
 
 				_, err = creatingVolume1.Created()
 				Expect(err).NotTo(HaveOccurred())
 
-				creatingVolume2, err := volumeRepository.CreateContainerVolume(team.ID(), worker.Name(), creatingContainer2, "some-path-1")
+				creatingVolume2, err := volumeRepository.CreateContainerVolume(team.ID(), worker.Name(), "some-path-1")
 				Expect(err).NotTo(HaveOccurred())
 
-				_, err = creatingVolume2.Created()
+				createdVolume2, err = creatingVolume2.Created()
 				Expect(err).NotTo(HaveOccurred())
+				createdVolume2.Attach(creatingContainer2)
 
 				createdContainer1, err := creatingContainer1.Created()
 				Expect(err).NotTo(HaveOccurred())

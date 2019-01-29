@@ -18,6 +18,7 @@ var _ = Describe("VolumeFactory", func() {
 		team2             db.Team
 		usedResourceCache db.UsedResourceCache
 		build             db.Build
+		err               error
 	)
 
 	BeforeEach(func() {
@@ -79,31 +80,25 @@ var _ = Describe("VolumeFactory", func() {
 
 		Context("with container volumes", func() {
 			JustBeforeEach(func() {
-				creatingContainer, err := defaultWorker.CreateContainer(db.NewBuildStepContainerOwner(build.ID(), "some-plan", defaultTeam.ID()), db.ContainerMetadata{
-					Type:     "task",
-					StepName: "some-task",
-				})
-				Expect(err).ToNot(HaveOccurred())
-
 				team1handles = []string{}
 				team2handles = []string{}
 
 				team2, err = teamFactory.CreateTeam(atc.Team{Name: "some-other-defaultTeam"})
 				Expect(err).ToNot(HaveOccurred())
 
-				creatingVolume1, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), defaultWorker.Name(), creatingContainer, "some-path-1")
+				creatingVolume1, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), defaultWorker.Name(), "some-path-1")
 				Expect(err).NotTo(HaveOccurred())
 				createdVolume1, err := creatingVolume1.Created()
 				Expect(err).NotTo(HaveOccurred())
 				team1handles = append(team1handles, createdVolume1.Handle())
 
-				creatingVolume2, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), defaultWorker.Name(), creatingContainer, "some-path-2")
+				creatingVolume2, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), defaultWorker.Name(), "some-path-2")
 				Expect(err).NotTo(HaveOccurred())
 				createdVolume2, err := creatingVolume2.Created()
 				Expect(err).NotTo(HaveOccurred())
 				team1handles = append(team1handles, createdVolume2.Handle())
 
-				creatingVolume3, err := volumeRepository.CreateContainerVolume(team2.ID(), defaultWorker.Name(), creatingContainer, "some-path-3")
+				creatingVolume3, err := volumeRepository.CreateContainerVolume(team2.ID(), defaultWorker.Name(), "some-path-3")
 				Expect(err).NotTo(HaveOccurred())
 				createdVolume3, err := creatingVolume3.Created()
 				Expect(err).NotTo(HaveOccurred())
@@ -161,9 +156,10 @@ var _ = Describe("VolumeFactory", func() {
 
 	Describe("GetOrphanedVolumes", func() {
 		var (
-			expectedCreatedHandles    []string
-			expectedDestroyingHandles []string
-			certsVolumeHandle         string
+			expectedCreatedHandles      []string
+			expectedNonDestroyedHandles []string
+			indestructibleVolume        db.CreatedVolume
+			indestructibleVolume2       db.CreatedVolume
 		)
 
 		BeforeEach(func() {
@@ -172,40 +168,61 @@ var _ = Describe("VolumeFactory", func() {
 				StepName: "some-task",
 			})
 			Expect(err).ToNot(HaveOccurred())
-			expectedCreatedHandles = []string{}
-			expectedDestroyingHandles = []string{}
 
-			creatingVolume1, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), defaultWorker.Name(), creatingContainer, "some-path-1")
+			indestructibleContainer, err := defaultWorker.CreateContainer(db.NewBuildStepContainerOwner(build.ID(), "some-plan", defaultTeam.ID()), db.ContainerMetadata{
+				Type:     "task",
+				StepName: "some-task",
+			})
+			Expect(err).ToNot(HaveOccurred())
+			expectedCreatedHandles = []string{}
+			expectedNonDestroyedHandles = []string{}
+
+			creatingVolume1, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), defaultWorker.Name(), "some-path-1")
 			Expect(err).NotTo(HaveOccurred())
 			createdVolume1, err := creatingVolume1.Created()
 			Expect(err).NotTo(HaveOccurred())
+			err = createdVolume1.Attach(creatingContainer)
+			Expect(err).NotTo(HaveOccurred())
 			expectedCreatedHandles = append(expectedCreatedHandles, createdVolume1.Handle())
 
-			creatingVolume2, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), defaultWorker.Name(), creatingContainer, "some-path-2")
+			creatingVolume2, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), defaultWorker.Name(), "some-path-2")
 			Expect(err).NotTo(HaveOccurred())
 			createdVolume2, err := creatingVolume2.Created()
 			Expect(err).NotTo(HaveOccurred())
+			err = createdVolume2.Attach(creatingContainer)
+			Expect(err).NotTo(HaveOccurred())
 			expectedCreatedHandles = append(expectedCreatedHandles, createdVolume2.Handle())
 
-			creatingVolume3, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), defaultWorker.Name(), creatingContainer, "some-path-3")
+			creatingVolume3, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), defaultWorker.Name(), "some-path-2")
 			Expect(err).NotTo(HaveOccurred())
-			createdVolume3, err := creatingVolume3.Created()
-			Expect(err).NotTo(HaveOccurred())
-			destroyingVolume3, err := createdVolume3.Destroying()
-			Expect(err).NotTo(HaveOccurred())
-			expectedDestroyingHandles = append(expectedDestroyingHandles, destroyingVolume3.Handle())
 
-			creatingVolumeOtherWorker, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), otherWorker.Name(), creatingContainer, "some-path-other-1")
+			indestructibleVolume, err = creatingVolume3.Created()
+			Expect(err).NotTo(HaveOccurred())
+			err = indestructibleVolume.Attach(indestructibleContainer)
+			Expect(err).NotTo(HaveOccurred())
+			expectedNonDestroyedHandles = append(expectedNonDestroyedHandles, indestructibleVolume.Handle())
+
+			creatingVolume4, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), defaultWorker.Name(), "some-path-2")
+			Expect(err).NotTo(HaveOccurred())
+			indestructibleVolume2, err = creatingVolume4.Created()
+			Expect(err).NotTo(HaveOccurred())
+			expectedNonDestroyedHandles = append(expectedNonDestroyedHandles, indestructibleVolume2.Handle())
+
+			creatingVolumeOtherWorker, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), otherWorker.Name(), "some-path-other-1")
 			Expect(err).NotTo(HaveOccurred())
 			createdVolumeOtherWorker, err := creatingVolumeOtherWorker.Created()
 			Expect(err).NotTo(HaveOccurred())
+			createdVolumeOtherWorker.Attach(creatingContainer)
+			Expect(err).NotTo(HaveOccurred())
 			expectedCreatedHandles = append(expectedCreatedHandles, createdVolumeOtherWorker.Handle())
 
-			resourceCacheVolume, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), defaultWorker.Name(), creatingContainer, "some-path-4")
+			resourceCacheVolume, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), defaultWorker.Name(), "some-path-4")
 			Expect(err).NotTo(HaveOccurred())
 			expectedCreatedHandles = append(expectedCreatedHandles, resourceCacheVolume.Handle())
 
 			resourceCacheVolumeCreated, err := resourceCacheVolume.Created()
+			Expect(err).NotTo(HaveOccurred())
+			resourceCacheVolumeCreated.Attach(creatingContainer)
 			Expect(err).NotTo(HaveOccurred())
 
 			usedWorkerBaseResourceType, found, err := workerBaseResourceTypeFactory.Find(defaultWorkerResourceType.Type, defaultWorker)
@@ -243,8 +260,7 @@ var _ = Describe("VolumeFactory", func() {
 
 			certsVolume, err := volumeRepository.CreateResourceCertsVolume(defaultWorker.Name(), workerResourceCerts)
 			Expect(err).NotTo(HaveOccurred())
-
-			certsVolumeHandle = certsVolume.Handle()
+			expectedNonDestroyedHandles = append(expectedNonDestroyedHandles, certsVolume.Handle())
 
 			deleted, err := build.Delete()
 			Expect(err).NotTo(HaveOccurred())
@@ -275,7 +291,7 @@ var _ = Describe("VolumeFactory", func() {
 				createdHandles = append(createdHandles, vol.Handle())
 			}
 			Expect(createdHandles).To(ConsistOf(expectedCreatedHandles))
-			Expect(createdHandles).ToNot(ContainElement(certsVolumeHandle))
+			Expect(createdHandles).ToNot(ConsistOf(expectedNonDestroyedHandles))
 		})
 
 		Context("when worker is stalled", func() {
@@ -320,13 +336,7 @@ var _ = Describe("VolumeFactory", func() {
 
 	Describe("DestroyFailedVolumes", func() {
 		BeforeEach(func() {
-			creatingContainer, err := defaultWorker.CreateContainer(db.NewBuildStepContainerOwner(build.ID(), "some-plan", defaultTeam.ID()), db.ContainerMetadata{
-				Type:     "task",
-				StepName: "some-task",
-			})
-			Expect(err).ToNot(HaveOccurred())
-
-			creatingVolume1, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), defaultWorker.Name(), creatingContainer, "some-path-1")
+			creatingVolume1, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), defaultWorker.Name(), "some-path-1")
 			Expect(err).NotTo(HaveOccurred())
 			_, err = creatingVolume1.Failed()
 			Expect(err).NotTo(HaveOccurred())
@@ -345,15 +355,9 @@ var _ = Describe("VolumeFactory", func() {
 
 		Context("when worker has detroying volumes", func() {
 			BeforeEach(func() {
-				creatingContainer, err := defaultWorker.CreateContainer(db.NewBuildStepContainerOwner(build.ID(), "some-plan", defaultTeam.ID()), db.ContainerMetadata{
-					Type:     "task",
-					StepName: "some-task",
-				})
-				Expect(err).ToNot(HaveOccurred())
-
 				expectedDestroyingHandles = []string{}
 
-				creatingVol, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), defaultWorker.Name(), creatingContainer, "some-path-1")
+				creatingVol, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), defaultWorker.Name(), "some-path-1")
 				Expect(err).NotTo(HaveOccurred())
 
 				createdVol, err := creatingVol.Created()
@@ -498,13 +502,8 @@ var _ = Describe("VolumeFactory", func() {
 
 			BeforeEach(func() {
 				var err error
-				creatingContainer, err := defaultWorker.CreateContainer(db.NewBuildStepContainerOwner(build.ID(), "some-plan", defaultTeam.ID()), db.ContainerMetadata{
-					Type:     "get",
-					StepName: "some-resource",
-				})
-				Expect(err).ToNot(HaveOccurred())
 
-				resourceCacheVolume, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), defaultWorker.Name(), creatingContainer, "some-path-4")
+				resourceCacheVolume, err := volumeRepository.CreateContainerVolume(defaultTeam.ID(), defaultWorker.Name(), "some-path-4")
 				Expect(err).NotTo(HaveOccurred())
 
 				existingVolume, err = resourceCacheVolume.Created()

@@ -14,7 +14,7 @@ import (
 type VolumeRepository interface {
 	GetTeamVolumes(teamID int) ([]CreatedVolume, error)
 
-	CreateContainerVolume(teamID int, workerName string, container CreatingContainer, mountPath string) (CreatingVolume, error)
+	CreateContainerVolume(teamID int, workerName string,mountPath string) (CreatingVolume, error)
 	FindContainerVolume(teamID int, workerName string, container CreatingContainer, mountPath string) (CreatingVolume, CreatedVolume, error)
 
 	FindBaseResourceTypeVolume(usedWorkerBaseResourceType *UsedWorkerBaseResourceType) (CreatingVolume, CreatedVolume, error)
@@ -254,12 +254,11 @@ func (repository *volumeRepository) CreateBaseResourceTypeVolume(uwbrt *UsedWork
 	return volume, nil
 }
 
-func (repository *volumeRepository) CreateContainerVolume(teamID int, workerName string, container CreatingContainer, mountPath string) (CreatingVolume, error) {
+func (repository *volumeRepository) CreateContainerVolume(teamID int, workerName string, mountPath string) (CreatingVolume, error) {
 	volume, err := repository.createVolume(
 		teamID,
 		workerName,
 		map[string]interface{}{
-			"container_id": container.ID(),
 			"path":         mountPath,
 		},
 		VolumeTypeContainer,
@@ -269,7 +268,6 @@ func (repository *volumeRepository) CreateContainerVolume(teamID int, workerName
 	}
 
 	volume.path = mountPath
-	volume.containerHandle = container.Handle()
 	return volume, nil
 }
 

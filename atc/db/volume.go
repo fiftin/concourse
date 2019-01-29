@@ -36,6 +36,15 @@ func (e ErrVolumeMarkCreatedFailed) Error() string {
 	return fmt.Sprintf("failed to mark volume as created %s", e.Handle)
 }
 
+type ErrVolumeFailedToAttach struct {
+	VolumeHandle string
+	ContainerHandle string
+}
+
+func (e ErrVolumeFailedToAttach) Error() string {
+	return fmt.Sprintf("could not attach volume %s to container %s", e.VolumeHandle, e.ContainerHandle)
+}
+
 type VolumeState string
 
 const (
@@ -155,6 +164,7 @@ type CreatedVolume interface {
 	ResourceType() (*VolumeResourceType, error)
 	BaseResourceType() (*UsedWorkerBaseResourceType, error)
 	TaskIdentifier() (string, string, string, error)
+	Attach(container CreatingContainer) error
 }
 
 type createdVolume struct {
@@ -555,6 +565,43 @@ type destroyingVolume struct {
 }
 
 func (volume *destroyingVolume) Handle() string     { return volume.handle }
+
+func (volume *createdVolume) Attach(container CreatingContainer) error {
+	var containerID sql.NullInt64
+	err := psql.Select("container_id").
+		From("volumes").
+		Where(sq.Eq{
+			"id": volume.id,
+		}).
+		RunWith(volume.conn).
+		QueryRow().Scan(&containerID)
+
+	if containerID.Valid || err != nil {
+		return ErrVolumeFailedToAttach{volume.handle, container.Handle()}
+	}
+
+	rows, err := psql.Update("volumes").
+		Set("container_id", container.ID()).
+		Where(sq.Eq{"id": volume.id}).
+		RunWith(volume.conn).
+		Exec()
+
+	if err != nil {
+		return err
+	}
+
+	affected, err := rows.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if affected == 0 {
+		return ErrVolumeFailedToAttach{volume.handle, container.Handle()}
+	}
+
+	return nil
+}
+
 func (volume *destroyingVolume) WorkerName() string { return volume.workerName }
 
 func (volume *destroyingVolume) Destroy() (bool, error) {

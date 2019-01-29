@@ -22,13 +22,12 @@ type FakeVolumeRepository struct {
 		result1 db.CreatingVolume
 		result2 error
 	}
-	CreateContainerVolumeStub        func(int, string, db.CreatingContainer, string) (db.CreatingVolume, error)
+	CreateContainerVolumeStub        func(int, string, string) (db.CreatingVolume, error)
 	createContainerVolumeMutex       sync.RWMutex
 	createContainerVolumeArgsForCall []struct {
 		arg1 int
 		arg2 string
-		arg3 db.CreatingContainer
-		arg4 string
+		arg3 string
 	}
 	createContainerVolumeReturns struct {
 		result1 db.CreatingVolume
@@ -331,19 +330,18 @@ func (fake *FakeVolumeRepository) CreateBaseResourceTypeVolumeReturnsOnCall(i in
 	}{result1, result2}
 }
 
-func (fake *FakeVolumeRepository) CreateContainerVolume(arg1 int, arg2 string, arg3 db.CreatingContainer, arg4 string) (db.CreatingVolume, error) {
+func (fake *FakeVolumeRepository) CreateContainerVolume(arg1 int, arg2 string, arg3 string) (db.CreatingVolume, error) {
 	fake.createContainerVolumeMutex.Lock()
 	ret, specificReturn := fake.createContainerVolumeReturnsOnCall[len(fake.createContainerVolumeArgsForCall)]
 	fake.createContainerVolumeArgsForCall = append(fake.createContainerVolumeArgsForCall, struct {
 		arg1 int
 		arg2 string
-		arg3 db.CreatingContainer
-		arg4 string
-	}{arg1, arg2, arg3, arg4})
-	fake.recordInvocation("CreateContainerVolume", []interface{}{arg1, arg2, arg3, arg4})
+		arg3 string
+	}{arg1, arg2, arg3})
+	fake.recordInvocation("CreateContainerVolume", []interface{}{arg1, arg2, arg3})
 	fake.createContainerVolumeMutex.Unlock()
 	if fake.CreateContainerVolumeStub != nil {
-		return fake.CreateContainerVolumeStub(arg1, arg2, arg3, arg4)
+		return fake.CreateContainerVolumeStub(arg1, arg2, arg3)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -358,17 +356,17 @@ func (fake *FakeVolumeRepository) CreateContainerVolumeCallCount() int {
 	return len(fake.createContainerVolumeArgsForCall)
 }
 
-func (fake *FakeVolumeRepository) CreateContainerVolumeCalls(stub func(int, string, db.CreatingContainer, string) (db.CreatingVolume, error)) {
+func (fake *FakeVolumeRepository) CreateContainerVolumeCalls(stub func(int, string, string) (db.CreatingVolume, error)) {
 	fake.createContainerVolumeMutex.Lock()
 	defer fake.createContainerVolumeMutex.Unlock()
 	fake.CreateContainerVolumeStub = stub
 }
 
-func (fake *FakeVolumeRepository) CreateContainerVolumeArgsForCall(i int) (int, string, db.CreatingContainer, string) {
+func (fake *FakeVolumeRepository) CreateContainerVolumeArgsForCall(i int) (int, string, string) {
 	fake.createContainerVolumeMutex.RLock()
 	defer fake.createContainerVolumeMutex.RUnlock()
 	argsForCall := fake.createContainerVolumeArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
 func (fake *FakeVolumeRepository) CreateContainerVolumeReturns(result1 db.CreatingVolume, result2 error) {

@@ -121,7 +121,7 @@ func (c *volumeClient) FindOrCreateVolumeForContainer(
 			return c.dbVolumeRepository.FindContainerVolume(teamID, c.dbWorker.Name(), container, mountPath)
 		},
 		func() (db.CreatingVolume, error) {
-			return c.dbVolumeRepository.CreateContainerVolume(teamID, c.dbWorker.Name(), container, mountPath)
+			return c.dbVolumeRepository.CreateContainerVolume(teamID, c.dbWorker.Name(),  mountPath)
 		},
 	)
 }
