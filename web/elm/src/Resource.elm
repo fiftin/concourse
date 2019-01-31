@@ -51,6 +51,7 @@ import Html.Styled.Attributes
 import Html.Styled.Events
     exposing
         ( onClick
+        , onFocus
         , onInput
         , onMouseEnter
         , onMouseLeave
@@ -668,6 +669,12 @@ update action model =
             , [ SetPinComment model.resourceIdentifier model.csrfToken comment ]
             )
 
+        FocusTextArea ->
+            ( model, [] )
+
+        KeyDowns _ ->
+            ( model, [] )
+
 
 updateVersion :
     Models.VersionId
@@ -1190,6 +1197,7 @@ commentBar ({ pinnedVersion, hovered, pinCommentLoading } as params) =
                             , onInput EditComment
                             , value commentState.comment
                             , placeholder "enter a comment"
+                            , onFocus FocusTextArea
                             ]
                             []
                         , Html.button
@@ -1671,4 +1679,5 @@ subscriptions : Model -> List (Subscription Msg)
 subscriptions model =
     [ OnClockTick (5 * Time.second) AutoupdateTimerTicked
     , OnClockTick Time.second ClockTick
+    , OnKeyDown
     ]
